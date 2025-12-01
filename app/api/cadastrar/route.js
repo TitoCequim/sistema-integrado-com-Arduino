@@ -1,7 +1,8 @@
 import fs from "fs";
 import nodemailer from "nodemailer";
 
-const EMAIL_FILE = "emails.json";
+const EMAIL_FILE = process.env.EMAIL
+
 const SENDER_EMAIL = "titocgmunhoes@gmail.com";
 
 const transporter = nodemailer.createTransport({
