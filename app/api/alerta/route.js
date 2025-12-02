@@ -2,7 +2,7 @@ import nodemailer from "nodemailer";
 
 const SENDER_EMAIL = "titocgmunhoes@gmail.com"; // email gmail
 const PASS = process.env.APP_PASSWORD;         
-const RECEIVER_EMAIL = "tito.78052@aluno.iffar.edu.br";     // o email fixo que vai receber
+const RECEIVER_EMAIL = "tito.78052@aluno.iffar.edu.br";     // o email fixo que vai receber status do arduino
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
