@@ -20,7 +20,7 @@ export async function POST(req) {
     from: SENDER_EMAIL,
     to: RECEIVER_EMAIL,
     subject: "Nova mensagem",
-    text: texto,
+    text: "O ESP32 saiu do perímetro!",
   });
 
   return Response.json({ ok: true });
