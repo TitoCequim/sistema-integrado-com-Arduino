@@ -1,3 +1,4 @@
+//não usar ainda
 import fs from "fs";
 import nodemailer from "nodemailer";
 
