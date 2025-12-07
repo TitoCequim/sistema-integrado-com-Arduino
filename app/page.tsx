@@ -9,7 +9,7 @@ export default function Home() {
   const [emailsCadastrados, setEmailsCadastrados] = useState([]);
   const [mensagem, setMensagem] = useState("");
   const [loading, setLoading] = useState(false);
-
+//teste
   async function enviarAlerta(currentEstado: string) {
     try {
       await fetch("/api/alerta", {
