@@ -1,4 +1,4 @@
-import { supabase } from '../../../lib/supabase';
+import { sql } from '../../../lib/neon';
 
 const GOOGLE_API_KEY = process.env.API_GOOGLE_GPS;
 
@@ -26,31 +26,28 @@ async function enviarParaGoogle(dados) {
 
 // Função auxiliar para obter ou criar registro de wifi_scans
 async function obterRegistroWifiScans() {
-  const { data, error } = await supabase
-    .from('wifi_scans')
-    .select('*')
-    .limit(1)
-    .single();
+  try {
+    // Tenta obter o registro existente
+    const registros = await sql`
+      SELECT * FROM wifi_scans LIMIT 1
+    `;
 
-  if (error && error.code === 'PGRST116') {
-    // Registro não existe, criar um
-    const { data: newData, error: insertError } = await supabase
-      .from('wifi_scans')
-      .insert({ scan_data: {}, ultimo_scan_array: [], scan_para_enviar: null })
-      .select()
-      .single();
-    
-    if (insertError) {
-      throw insertError;
+    if (registros && registros.length > 0) {
+      return registros[0];
     }
-    return newData;
-  }
 
-  if (error) {
-    throw error;
-  }
+    // Se não existe, cria um novo
+    const novoRegistro = await sql`
+      INSERT INTO wifi_scans (scan_data, ultimo_scan_array, scan_para_enviar) 
+      VALUES ('{}'::jsonb, '[]'::jsonb, NULL) 
+      RETURNING *
+    `;
 
-  return data;
+    return novoRegistro[0];
+  } catch (err) {
+    console.error("Erro ao obter registro de wifi_scans:", err);
+    throw err;
+  }
 }
 
 // GET para enviar scan para Google (quando há scan pronto)
@@ -68,10 +65,11 @@ export async function GET() {
     const resultado = await enviarParaGoogle(registro.scan_para_enviar);
     
     // Limpa o scan após envio
-    await supabase
-      .from('wifi_scans')
-      .update({ scan_para_enviar: null })
-      .eq('id', registro.id);
+    await sql`
+      UPDATE wifi_scans 
+      SET scan_para_enviar = NULL
+      WHERE id = ${registro.id}
+    `;
 
     return new Response(JSON.stringify({ ok: true, resultado }), { 
       status: 200,
@@ -105,10 +103,11 @@ export async function POST(req) {
       const resultado = await enviarParaGoogle(registro.scan_para_enviar);
       
       // Limpa o scan após envio
-      await supabase
-        .from('wifi_scans')
-        .update({ scan_para_enviar: null })
-        .eq('id', registro.id);
+      await sql`
+        UPDATE wifi_scans 
+        SET scan_para_enviar = NULL
+        WHERE id = ${registro.id}
+      `;
 
       return new Response(JSON.stringify({ ok: true, resultado }), { 
         status: 200,
@@ -127,14 +126,14 @@ export async function POST(req) {
 
     if (mudou) {
       // Atualiza no banco de dados
-      await supabase
-        .from('wifi_scans')
-        .update({
-          scan_data: body,
-          ultimo_scan_array: novoScanArray,
-          scan_para_enviar: body  // marca para envio
-        })
-        .eq('id', registro.id);
+      await sql`
+        UPDATE wifi_scans 
+        SET 
+          scan_data = ${JSON.stringify(body)}::jsonb,
+          ultimo_scan_array = ${JSON.stringify(novoScanArray)}::jsonb,
+          scan_para_enviar = ${JSON.stringify(body)}::jsonb
+        WHERE id = ${registro.id}
+      `;
 
       console.log("Novo scan recebido e pronto para envio:", body);
     } else {

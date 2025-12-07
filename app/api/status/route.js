@@ -1,40 +1,37 @@
-import { supabase } from '../../../lib/supabase';
+import { sql } from '../../../lib/neon';
 
 //const API_TOKEN = "MEU_TOKEN_SECRETO_123";
 
 // Função auxiliar para obter ou criar registro de status
 async function obterRegistroStatus() {
-  const { data, error } = await supabase
-    .from('esp32_status')
-    .select('*')
-    .limit(1)
-    .single();
+  try {
+    // Tenta obter o registro existente
+    const registros = await sql`
+      SELECT * FROM esp32_status LIMIT 1
+    `;
 
-  if (error && error.code === 'PGRST116') {
-    // Registro não existe, criar um
-    const { data: newData, error: insertError } = await supabase
-      .from('esp32_status')
-      .insert({ estado: 'desconhecido' })
-      .select()
-      .single();
-    
-    if (insertError) {
-      throw insertError;
+    if (registros && registros.length > 0) {
+      return registros[0];
     }
-    return newData;
-  }
 
-  if (error) {
-    throw error;
-  }
+    // Se não existe, cria um novo
+    const novoRegistro = await sql`
+      INSERT INTO esp32_status (estado) 
+      VALUES ('desconhecido') 
+      RETURNING *
+    `;
 
-  return data;
+    return novoRegistro[0];
+  } catch (err) {
+    console.error("Erro ao obter registro de status:", err);
+    throw err;
+  }
 }
 
 export async function GET() {
   try {
     const registro = await obterRegistroStatus();
-    return Response.json({ estado: registro.estado || 'desconhecido' });
+    return Response.json({ estado: registro?.estado || 'desconhecido' });
   } catch (err) {
     console.error("Erro em GET /api/status:", err);
     return Response.json({ estado: 'desconhecido' }, { status: 500 });
@@ -59,14 +56,11 @@ export async function POST(req) {
     const registro = await obterRegistroStatus();
     
     // Atualiza o estado no banco de dados
-    const { error } = await supabase
-      .from('esp32_status')
-      .update({ estado: novoEstado })
-      .eq('id', registro.id);
-
-    if (error) {
-      throw error;
-    }
+    await sql`
+      UPDATE esp32_status 
+      SET estado = ${novoEstado}
+      WHERE id = ${registro.id}
+    `;
 
     return Response.json({ ok: true });
   } catch (err) {

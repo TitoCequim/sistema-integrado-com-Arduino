@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { supabase } from '../../../lib/supabase';
+import { sql } from '../../../lib/neon';
 
 const SENDER_EMAIL = "titocgmunhoes@gmail.com"; // email gmail
 const PASS = process.env.APP_PASSWORD;         
@@ -18,15 +18,10 @@ export async function POST(req) {
     const { estado } = body;
 
     // Busca todos os emails cadastrados e ativos
-    const { data: emails, error: emailError } = await supabase
-      .from('emails_cadastrados')
-      .select('email')
-      .eq('ativo', true);
-
-    if (emailError) {
-      console.error("Erro ao buscar emails:", emailError);
-      throw emailError;
-    }
+    const emails = await sql`
+      SELECT email FROM emails_cadastrados 
+      WHERE ativo = true
+    `;
 
     // Se não houver emails cadastrados, retorna sucesso mas não envia
     if (!emails || emails.length === 0) {

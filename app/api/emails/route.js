@@ -1,19 +1,15 @@
-import { supabase } from '../../../lib/supabase';
+import { sql } from '../../../lib/neon';
 
 // GET: Lista todos os emails cadastrados
 export async function GET() {
   try {
-    const { data, error } = await supabase
-      .from('emails_cadastrados')
-      .select('*')
-      .eq('ativo', true)
-      .order('created_at', { ascending: false });
+    const emails = await sql`
+      SELECT * FROM emails_cadastrados 
+      WHERE ativo = true 
+      ORDER BY created_at DESC
+    `;
 
-    if (error) {
-      throw error;
-    }
-
-    return Response.json({ ok: true, emails: data || [] });
+    return Response.json({ ok: true, emails: emails || [] });
   } catch (err) {
     console.error("Erro em GET /api/emails:", err);
     return Response.json({ ok: false, error: err.message }, { status: 500 });
@@ -37,23 +33,22 @@ export async function POST(req) {
     const emailNormalizado = email.toLowerCase().trim();
 
     // Verifica se o email já existe
-    const { data: existente } = await supabase
-      .from('emails_cadastrados')
-      .select('id, ativo')
-      .eq('email', emailNormalizado)
-      .single();
+    const existentes = await sql`
+      SELECT id, ativo FROM emails_cadastrados 
+      WHERE email = ${emailNormalizado}
+      LIMIT 1
+    `;
 
-    if (existente) {
+    if (existentes && existentes.length > 0) {
+      const existente = existentes[0];
+      
       // Se existe mas está inativo, reativa
       if (!existente.ativo) {
-        const { error: updateError } = await supabase
-          .from('emails_cadastrados')
-          .update({ ativo: true })
-          .eq('id', existente.id);
-
-        if (updateError) {
-          throw updateError;
-        }
+        await sql`
+          UPDATE emails_cadastrados 
+          SET ativo = true 
+          WHERE id = ${existente.id}
+        `;
 
         return Response.json({ 
           ok: true, 
@@ -70,26 +65,22 @@ export async function POST(req) {
     }
 
     // Insere novo email
-    const { data, error } = await supabase
-      .from('emails_cadastrados')
-      .insert({ email: emailNormalizado, ativo: true })
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
+    const novoEmail = await sql`
+      INSERT INTO emails_cadastrados (email, ativo) 
+      VALUES (${emailNormalizado}, true)
+      RETURNING *
+    `;
 
     return Response.json({ 
       ok: true, 
       message: "Email cadastrado com sucesso!",
-      email: data 
+      email: novoEmail[0]
     });
   } catch (err) {
     console.error("Erro em POST /api/emails:", err);
     
     // Erro de constraint única (email duplicado)
-    if (err.code === '23505') {
+    if (err.code === '23505' || err.message?.includes('unique constraint') || err.message?.includes('duplicate key')) {
       return Response.json({ 
         ok: false, 
         error: "Este email já está cadastrado." 
@@ -119,14 +110,11 @@ export async function DELETE(req) {
     const emailNormalizado = email.toLowerCase().trim();
 
     // Desativa o email (soft delete)
-    const { error } = await supabase
-      .from('emails_cadastrados')
-      .update({ ativo: false })
-      .eq('email', emailNormalizado);
-
-    if (error) {
-      throw error;
-    }
+    await sql`
+      UPDATE emails_cadastrados 
+      SET ativo = false 
+      WHERE email = ${emailNormalizado}
+    `;
 
     return Response.json({ 
       ok: true, 

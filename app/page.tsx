@@ -2,11 +2,19 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 
+interface EmailCadastrado {
+  id: number;
+  email: string;
+  ativo: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export default function Home() {
   const [estado, setEstado] = useState("desconhecido");
   const alertaEnviadoRef = useRef(false);
   const [emailInput, setEmailInput] = useState("");
-  const [emailsCadastrados, setEmailsCadastrados] = useState([]);
+  const [emailsCadastrados, setEmailsCadastrados] = useState<EmailCadastrado[]>([]);
   const [mensagem, setMensagem] = useState("");
   const [loading, setLoading] = useState(false);
 //teste
@@ -88,7 +96,7 @@ export default function Home() {
     }
   }
 
-  async function removerEmail(email) {
+  async function removerEmail(email: string) {
     if (!confirm(`Deseja remover o email ${email}?`)) {
       return;
     }

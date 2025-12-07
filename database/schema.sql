@@ -1,5 +1,5 @@
 -- Schema do banco de dados para persistir dados do ESP32
--- Execute este SQL no SQL Editor do Supabase
+-- Execute este SQL no SQL Editor do Neon (ou qualquer cliente PostgreSQL)
 
 -- Tabela para armazenar o estado atual do ESP32
 CREATE TABLE IF NOT EXISTS esp32_status (
