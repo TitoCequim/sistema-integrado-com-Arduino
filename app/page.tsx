@@ -17,7 +17,8 @@ export default function Home() {
       console.error("Erro ao enviar alerta:", error);
     }
   }
-async function chamarGoogle() {
+
+  async function chamarGoogle() {
     const resposta = await fetch("/api/status2", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -25,9 +26,7 @@ async function chamarGoogle() {
     });
 
     const json = await resposta.json();
-    console.log(json); // mostra o resultado no console
-
-
+    console.log(json);
   }
 
   async function atualizar() {
@@ -40,9 +39,14 @@ async function chamarGoogle() {
     }
   }
 
+  // ✅ Correção do useEffect
   useEffect(() => {
-    atualizar();
-    const i = setInterval(atualizar, 1500);
+    const atualizarAsync = async () => {
+      await atualizar();
+    };
+
+    atualizarAsync();
+    const i = setInterval(atualizarAsync, 1500);
     return () => clearInterval(i);
   }, []);
 
@@ -65,9 +69,10 @@ async function chamarGoogle() {
         {estado === "fora" && "Fora do Perímetro"}
         {estado === "desconhecido" && "Aguardando..."}
       </p>
+
       <div>
-      <button onClick={chamarGoogle}>Chamar Google</button>
-    </div>
+        <button onClick={chamarGoogle}>Chamar Google</button>
+      </div>
     </div>
   );
 }
