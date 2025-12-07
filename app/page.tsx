@@ -6,6 +6,9 @@ export default function Home() {
   const [estado, setEstado] = useState("desconhecido");
   const alertaEnviadoRef = useRef(false);
 
+  const [email, setEmail] = useState("");         //  novo
+  const [msgEmail, setMsgEmail] = useState("");   //  novo
+
   async function enviarAlerta(currentEstado: string) {
     try {
       await fetch("/api/alerta", {
@@ -16,6 +19,17 @@ export default function Home() {
     } catch (error) {
       console.error("Erro ao enviar alerta:", error);
     }
+  }
+
+  async function chamarGoogle() {
+    const resposta = await fetch("/api/status2", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "chamar_google" }),
+    });
+
+    const json = await resposta.json();
+    console.log(json);
   }
 
   async function atualizar() {
@@ -43,6 +57,24 @@ export default function Home() {
     }
   }, [estado]);
 
+
+  // NOVO
+  async function cadastrarEmail() {
+    try {
+      const r = await fetch("/api/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const json = await r.json();
+      setMsgEmail(json.msg || json.error || "Erro");
+    } catch (err) {
+      setMsgEmail("Erro ao conectar com API");
+    }
+  }
+
+
   return (
     <div style={{ padding: 20 }}>
       <h1>Bem vindo!</h1>
@@ -53,6 +85,31 @@ export default function Home() {
         {estado === "fora" && "Fora do Perímetro"}
         {estado === "desconhecido" && "Aguardando..."}
       </p>
+
+      <div>
+        <button onClick={chamarGoogle}>Chamar Google</button>
+      </div>
+
+      <hr style={{ margin: "20px 0" }} />
+
+      <h2>Cadastrar email</h2>
+
+      <input
+        type="email"
+        placeholder="Digite seu email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        style={{ padding: 5, width: 250 }}
+      />
+
+      <button
+        onClick={cadastrarEmail}
+        style={{ marginLeft: 10, padding: "5px 10px" }}
+      >
+        Cadastrar
+      </button>
+
+      <p>{msgEmail}</p>
     </div>
   );
 }
