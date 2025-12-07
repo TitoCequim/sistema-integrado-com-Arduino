@@ -9,7 +9,7 @@ type ActionResponse = {
 };
 
 export async function createComment(formData: FormData): Promise<ActionResponse> {
-  const sql = neon(process.env.DATABASE_URL!);
+  const sql = neon(process.env.ARMAZENAR_DATABASE_URL!);
   const rawComment = formData.get('comment');
 
   if (!rawComment || typeof rawComment !== 'string') {
