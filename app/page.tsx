@@ -17,6 +17,8 @@ export default function Home() {
   const [emailsCadastrados, setEmailsCadastrados] = useState<EmailCadastrado[]>([]);
   const [mensagem, setMensagem] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleResultado, setGoogleResultado] = useState<any>(null);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
 //teste
   async function enviarAlerta(currentEstado: string) {
     try {
@@ -31,14 +33,30 @@ export default function Home() {
   }
 
   async function chamarGoogle() {
-    const resposta = await fetch("/api/status2", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acao: "chamar_google" })
-    });
+    setLoadingGoogle(true);
+    setGoogleResultado(null);
+    
+    try {
+      const resposta = await fetch("/api/status2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "chamar_google" })
+      });
 
-    const json = await resposta.json();
-    console.log(json);
+      const json = await resposta.json();
+      
+      if (json.ok) {
+        setGoogleResultado(json.resultado);
+        // Os dados já foram apagados automaticamente pela API após o envio
+      } else {
+        setGoogleResultado({ error: json.error || "Erro ao chamar API do Google" });
+      }
+    } catch (error) {
+      console.error("Erro ao chamar Google:", error);
+      setGoogleResultado({ error: "Erro ao conectar com a API" });
+    } finally {
+      setLoadingGoogle(false);
+    }
   }
 
   async function atualizar() {
@@ -160,10 +178,116 @@ export default function Home() {
         </p>
 
         <div style={{ marginTop: 15 }}>
-          <button onClick={chamarGoogle} style={{ padding: "8px 16px", cursor: "pointer" }}>
-            Chamar Google
+          <button 
+            onClick={chamarGoogle} 
+            disabled={loadingGoogle}
+            style={{ 
+              padding: "8px 16px", 
+              cursor: loadingGoogle ? "not-allowed" : "pointer",
+              opacity: loadingGoogle ? 0.6 : 1,
+              backgroundColor: "#4285f4",
+              color: "white",
+              border: "none",
+              borderRadius: 4,
+              fontSize: 14,
+              fontWeight: "bold"
+            }}
+          >
+            {loadingGoogle ? "Enviando..." : "📍 Chamar API do Google"}
           </button>
         </div>
+
+        {googleResultado && (
+          <div style={{ 
+            marginTop: 20, 
+            padding: 15, 
+            backgroundColor: "#f8f9fa", 
+            borderRadius: 8,
+            border: "1px solid #dee2e6"
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: 10 }}>📍 Resultado da Geolocalização:</h3>
+            
+            {googleResultado.error ? (
+              <div style={{ 
+                padding: 10, 
+                backgroundColor: "#f8d7da", 
+                color: "#721c24", 
+                borderRadius: 4 
+              }}>
+                <strong>Erro:</strong> {googleResultado.error}
+              </div>
+            ) : (
+              <div>
+                {googleResultado.location && (
+                  <div style={{ marginBottom: 15 }}>
+                    <h4 style={{ marginBottom: 8, color: "#333" }}>📍 Localização:</h4>
+                    <div style={{ 
+                      padding: 10, 
+                      backgroundColor: "white", 
+                      borderRadius: 4,
+                      fontFamily: "monospace",
+                      fontSize: 13
+                    }}>
+                      <div><strong>Latitude:</strong> {googleResultado.location.lat}</div>
+                      <div><strong>Longitude:</strong> {googleResultado.location.lng}</div>
+                      {googleResultado.accuracy && (
+                        <div><strong>Precisão:</strong> {googleResultado.accuracy} metros</div>
+                      )}
+                    </div>
+                    
+                    {googleResultado.location.lat && googleResultado.location.lng && (
+                      <div style={{ marginTop: 10 }}>
+                        <a
+                          href={`https://www.google.com/maps?q=${googleResultado.location.lat},${googleResultado.location.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "inline-block",
+                            padding: "8px 16px",
+                            backgroundColor: "#4285f4",
+                            color: "white",
+                            textDecoration: "none",
+                            borderRadius: 4,
+                            fontSize: 14,
+                            fontWeight: "bold"
+                          }}
+                        >
+                          🗺️ Abrir no Google Maps
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div style={{ marginTop: 15 }}>
+                  <h4 style={{ marginBottom: 8, color: "#333" }}>📋 Dados Completos (JSON):</h4>
+                  <pre style={{ 
+                    padding: 10, 
+                    backgroundColor: "#2d2d2d", 
+                    color: "#f8f8f2",
+                    borderRadius: 4,
+                    overflow: "auto",
+                    fontSize: 12,
+                    maxHeight: 300
+                  }}>
+                    {JSON.stringify(googleResultado, null, 2)}
+                  </pre>
+                </div>
+                
+                <div style={{ 
+                  marginTop: 10, 
+                  padding: 8, 
+                  backgroundColor: "#d4edda", 
+                  color: "#155724", 
+                  borderRadius: 4,
+                  fontSize: 12
+                }}>
+                  ✅ Dados enviados e apagados do banco de dados automaticamente
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: 30, padding: 20, border: "1px solid #ddd", borderRadius: 8 }}>
