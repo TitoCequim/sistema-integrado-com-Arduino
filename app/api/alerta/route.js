@@ -36,7 +36,7 @@ export async function POST(req) {
     const destinatarios = emails.map(e => e.email).join(', ');
 
     // Envia email para todos os emails cadastrados
-    const info = await transporter.sendMail({
+    await transporter.sendMail({
       from: SENDER_EMAIL,
       to: destinatarios,
       subject: "🚨 Alerta: ESP32 saiu do perímetro!",

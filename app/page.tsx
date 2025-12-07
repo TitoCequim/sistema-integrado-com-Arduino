@@ -10,6 +10,17 @@ interface EmailCadastrado {
   updated_at?: string;
 }
 
+interface GoogleLocation {
+  lat: number;
+  lng: number;
+}
+
+interface GoogleResultado {
+  location?: GoogleLocation;
+  accuracy?: number;
+  error?: string;
+}
+
 export default function Home() {
   const [estado, setEstado] = useState("desconhecido");
   const alertaEnviadoRef = useRef(false);
@@ -17,7 +28,7 @@ export default function Home() {
   const [emailsCadastrados, setEmailsCadastrados] = useState<EmailCadastrado[]>([]);
   const [mensagem, setMensagem] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleResultado, setGoogleResultado] = useState<any>(null);
+  const [googleResultado, setGoogleResultado] = useState<GoogleResultado | null>(null);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
 //teste
   async function enviarAlerta(currentEstado: string) {
