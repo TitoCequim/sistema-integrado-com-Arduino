@@ -125,7 +125,7 @@ export async function POST(req) {
     const mudou = JSON.stringify(novoScanArray) !== JSON.stringify(ultimoScanArray);
 
     if (mudou) {
-      // Atualiza no banco de dados
+      // Substitui TODOS os dados antigos pelos novos (sempre mantém só os mais recentes)
       await sql`
         UPDATE wifi_scans 
         SET 
@@ -135,7 +135,7 @@ export async function POST(req) {
         WHERE id = ${registro.id}
       `;
 
-      console.log("Novo scan recebido e pronto para envio:", body);
+      console.log("Novo scan recebido - dados antigos substituídos pelos novos:", body);
     } else {
       console.log("Nenhuma alteração no scan. Nada para enviar.");
     }
