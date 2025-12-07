@@ -6,6 +6,7 @@ export default function Home() {
   const [estado, setEstado] = useState("desconhecido");
   const alertaEnviadoRef = useRef(false);
 
+  // Função para enviar alerta ao servidor
   async function enviarAlerta(currentEstado: string) {
     try {
       await fetch("/api/alerta", {
@@ -18,17 +19,23 @@ export default function Home() {
     }
   }
 
+  // Função para chamar o Google via API
   async function chamarGoogle() {
-    const resposta = await fetch("/api/status2", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acao: "chamar_google" })
-    });
+    try {
+      const resposta = await fetch("/api/status2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "chamar_google" }),
+      });
 
-    const json = await resposta.json();
-    console.log(json);
+      const json = await resposta.json();
+      console.log(json);
+    } catch (error) {
+      console.error("Erro ao chamar Google:", error);
+    }
   }
 
+  // Atualiza o estado do ESP32
   async function atualizar() {
     try {
       const r = await fetch("/api/status");
@@ -39,17 +46,21 @@ export default function Home() {
     }
   }
 
-  // ✅ Correção do useEffect
+  // Efeito para atualizar estado periodicamente
   useEffect(() => {
-    const atualizarAsync = async () => {
-      await atualizar();
-    };
+    // IIFE async evita warning de setState dentro do efeito
+    (async () => {
+      await atualizar(); // atualiza imediatamente ao montar
+    })();
 
-    atualizarAsync();
-    const i = setInterval(atualizarAsync, 1500);
-    return () => clearInterval(i);
+    const interval = setInterval(() => {
+      atualizar(); // atualiza a cada 1,5s
+    }, 1500);
+
+    return () => clearInterval(interval);
   }, []);
 
+  // Efeito para enviar alerta quando o ESP32 sair do perímetro
   useEffect(() => {
     if (estado === "fora" && !alertaEnviadoRef.current) {
       enviarAlerta(estado);
