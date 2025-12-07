@@ -1,116 +1,262 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useRef, FormEvent } from 'react';
-import { createComment } from './actions/createComment';
+import { useEffect, useState, useRef, useCallback } from "react";
 
 export default function Home() {
-  const [estado, setEstado] = useState('desconhecido');
+  const [estado, setEstado] = useState("desconhecido");
   const alertaEnviadoRef = useRef(false);
-  const [comment, setComment] = useState('');
+  const [emailInput, setEmailInput] = useState("");
+  const [emailsCadastrados, setEmailsCadastrados] = useState([]);
+  const [mensagem, setMensagem] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Função para enviar alerta ao servidor
   async function enviarAlerta(currentEstado: string) {
     try {
-      await fetch('/api/alerta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/alerta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ estado: currentEstado }),
       });
     } catch (error) {
-      console.error('Erro ao enviar alerta:', error);
+      console.error("Erro ao enviar alerta:", error);
     }
   }
 
-  // Função para chamar o Google via API
   async function chamarGoogle() {
-    try {
-      const resposta = await fetch('/api/status2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ acao: 'chamar_google' }),
-      });
+    const resposta = await fetch("/api/status2", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acao: "chamar_google" })
+    });
 
-      const json = await resposta.json();
-      console.log(json);
-    } catch (error) {
-      console.error('Erro ao chamar Google:', error);
-    }
+    const json = await resposta.json();
+    console.log(json);
   }
 
-  // Atualiza o estado do ESP32
   async function atualizar() {
     try {
-      const r = await fetch('/api/status');
+      const r = await fetch("/api/status");
       const data = await r.json();
       setEstado(data.estado);
     } catch (err) {
-      console.error('Erro ao atualizar estado:', err);
+      console.error("Erro ao atualizar estado:", err);
     }
   }
 
-  // Efeito para atualizar estado periodicamente
-  useEffect(() => {
-    (async () => {
-      await atualizar();
-    })();
-
-    const interval = setInterval(() => {
-      atualizar();
-    }, 1500);
-
-    return () => clearInterval(interval);
+  const carregarEmails = useCallback(async () => {
+    try {
+      const r = await fetch("/api/emails");
+      const data = await r.json();
+      if (data.ok) {
+        setEmailsCadastrados(data.emails || []);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar emails:", err);
+    }
   }, []);
 
-  // Efeito para enviar alerta quando o ESP32 sair do perímetro
+  async function cadastrarEmail() {
+    if (!emailInput.trim() || !emailInput.includes("@")) {
+      setMensagem("Por favor, insira um email válido.");
+      return;
+    }
+
+    setLoading(true);
+    setMensagem("");
+
+    try {
+      const r = await fetch("/api/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput }),
+      });
+
+      const data = await r.json();
+
+      if (data.ok) {
+        setMensagem("✅ " + data.message);
+        setEmailInput("");
+        await carregarEmails();
+      } else {
+        setMensagem("❌ " + (data.error || "Erro ao cadastrar email"));
+      }
+    } catch (error) {
+      setMensagem("❌ Erro ao cadastrar email. Tente novamente.");
+      console.error("Erro:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removerEmail(email) {
+    if (!confirm(`Deseja remover o email ${email}?`)) {
+      return;
+    }
+
+    try {
+      const r = await fetch("/api/emails", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await r.json();
+
+      if (data.ok) {
+        setMensagem("✅ " + data.message);
+        await carregarEmails();
+      } else {
+        setMensagem("❌ " + (data.error || "Erro ao remover email"));
+      }
+    } catch (error) {
+      setMensagem("❌ Erro ao remover email. Tente novamente.");
+      console.error("Erro:", error);
+    }
+  }
+
+  // ✅ Correção do useEffect
   useEffect(() => {
-    if (estado === 'fora' && !alertaEnviadoRef.current) {
+    const atualizarAsync = async () => {
+      await atualizar();
+    };
+
+    atualizarAsync();
+    const i = setInterval(atualizarAsync, 1500);
+    return () => clearInterval(i);
+  }, []);
+
+  // Carrega emails ao montar o componente
+  useEffect(() => {
+    carregarEmails();
+  }, [carregarEmails]);
+
+  useEffect(() => {
+    if (estado === "fora" && !alertaEnviadoRef.current) {
       enviarAlerta(estado);
       alertaEnviadoRef.current = true;
-    } else if (estado === 'dentro') {
+    } else if (estado === "dentro") {
       alertaEnviadoRef.current = false;
     }
   }, [estado]);
 
-  // Enviar comentário
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const formData = new FormData();
-    formData.set('comment', comment);
-
-    try {
-      await createComment(formData);
-      setComment(''); // limpa input
-      alert('Comentário enviado!');
-    } catch (err) {
-      console.error('Erro ao criar comentário:', err);
-    }
-  }
-
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
       <h1>Bem vindo!</h1>
 
-      <h2>Status do ESP32:</h2>
-      <p>
-        {estado === 'dentro' && 'Dentro do Perímetro'}
-        {estado === 'fora' && 'Fora do Perímetro'}
-        {estado === 'desconhecido' && 'Aguardando...'}
-      </p>
+      <div style={{ marginBottom: 30, padding: 20, border: "1px solid #ddd", borderRadius: 8 }}>
+        <h2>Status do ESP32:</h2>
+        <p style={{ fontSize: 18, fontWeight: "bold" }}>
+          {estado === "dentro" && "🟢 Dentro do Perímetro"}
+          {estado === "fora" && "🔴 Fora do Perímetro"}
+          {estado === "desconhecido" && "⏳ Aguardando..."}
+        </p>
 
-      <div>
-        <button onClick={chamarGoogle}>Chamar Google</button>
+        <div style={{ marginTop: 15 }}>
+          <button onClick={chamarGoogle} style={{ padding: "8px 16px", cursor: "pointer" }}>
+            Chamar Google
+          </button>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="write a comment"
-          name="comment"
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-        />
-        <button type="submit">Submit</button>
-      </form>
+      <div style={{ marginBottom: 30, padding: 20, border: "1px solid #ddd", borderRadius: 8 }}>
+        <h2>📧 Cadastro de Emails para Alertas</h2>
+        <p style={{ color: "#666", marginBottom: 15 }}>
+          Cadastre seu email para receber alertas quando o ESP32 sair do perímetro.
+        </p>
+
+        <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
+          <input
+            type="email"
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            placeholder="seu@email.com"
+            style={{
+              flex: 1,
+              padding: "10px",
+              fontSize: 16,
+              border: "1px solid #ddd",
+              borderRadius: 4,
+            }}
+            onKeyPress={(e) => {
+              if (e.key === "Enter") {
+                cadastrarEmail();
+              }
+            }}
+          />
+          <button
+            onClick={cadastrarEmail}
+            disabled={loading}
+            style={{
+              padding: "10px 20px",
+              fontSize: 16,
+              backgroundColor: "#0070f3",
+              color: "white",
+              border: "none",
+              borderRadius: 4,
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            {loading ? "Cadastrando..." : "Cadastrar"}
+          </button>
+        </div>
+
+        {mensagem && (
+          <div
+            style={{
+              padding: 10,
+              marginBottom: 15,
+              borderRadius: 4,
+              backgroundColor: mensagem.includes("✅") ? "#d4edda" : "#f8d7da",
+              color: mensagem.includes("✅") ? "#155724" : "#721c24",
+            }}
+          >
+            {mensagem}
+          </div>
+        )}
+
+        <div style={{ marginTop: 20 }}>
+          <h3 style={{ marginBottom: 10 }}>Emails Cadastrados ({emailsCadastrados.length}):</h3>
+          {emailsCadastrados.length === 0 ? (
+            <p style={{ color: "#999", fontStyle: "italic" }}>
+              Nenhum email cadastrado ainda.
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {emailsCadastrados.map((item) => (
+                <li
+                  key={item.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "10px",
+                    marginBottom: 8,
+                    backgroundColor: "#f5f5f5",
+                    borderRadius: 4,
+                  }}
+                >
+                  <span>{item.email}</span>
+                  <button
+                    onClick={() => removerEmail(item.email)}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: 12,
+                      backgroundColor: "#dc3545",
+                      color: "white",
+                      border: "none",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Remover
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
