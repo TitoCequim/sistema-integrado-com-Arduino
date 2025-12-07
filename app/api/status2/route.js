@@ -1,57 +1,56 @@
-let ultimoEstado = null;
 let ultimoScan = { wifiAccessPoints: [] }; // Guarda o último JSON recebido
+let scanParaEnviar = null; // Guarda o scan que pode ser enviado para Google API
 const GOOGLE_API_KEY = process.env.API_GOOGLE_GPS;
 
-async function enviarParaGoogle() {
-  const url = `https://www.googleapis.com/geolocation/v1/geolocate?key=${GOOGLE_API_KEY}`;
-
-  // envia o último scan para o Google, ou vazio se nenhum scan
-  const body = ultimoScan.wifiAccessPoints.length
-    ? { wifiAccessPoints: ultimoScan.wifiAccessPoints }
-    : {};
-
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  return await r.json();
+// Função que envia para a Google API
+async function enviarParaGoogle(dados) {
+  const urlGoogle = `https://www.googleapis.com/geolocation/v1/geolocate?key=${GOOGLE_API_KEY}`;
+  try {
+    const response = await fetch(urlGoogle, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados)
+    });
+    const resultado = await response.json();
+    console.log("Resposta da Google API:", resultado);
+    return resultado;
+  } catch (error) {
+    console.error("Erro ao enviar para Google API:", error);
+    return { error: error.message };
+  }
 }
 
-export async function GET() {
-  // Retorna os dados atuais
-  return Response.json({ estado: ultimoEstado, scan: ultimoScan });
-}
-
+// Endpoint que recebe scan (como status2)
 export async function POST(req) {
   try {
-    const body = await req.json();
+    const novoScan = await req.json();
 
-    // Atualiza estado se enviado
-    if (body.estado) {
-      ultimoEstado = body.estado;
-      return Response.json({ ok: true, salvo: ultimoEstado });
+    // Comparar com o último scan
+    const mudou = JSON.stringify(novoScan) !== JSON.stringify(ultimoScan);
+
+    if (mudou) {
+      ultimoScan = novoScan;          // Atualiza último scan
+      scanParaEnviar = novoScan;      // Marca para envio futuro
+      console.log("Novo scan recebido e pronto para envio:", novoScan);
+    } else {
+      console.log("Nenhuma alteração no scan. Nada para enviar.");
     }
 
-    // Atualiza scan de Wi-Fi se enviado
-    if (body.wifiAccessPoints) {
-      ultimoScan = body;
-      return Response.json({ ok: true, salvo: ultimoScan });
-    }
-
-    // Chamar Google
-    if (body.acao === "chamar_google") {
-      if (!ultimoScan.wifiAccessPoints.length) {
-        return Response.json({ ok: false, erro: "Nenhum scan de Wi-Fi salvo" });
-      }
-
-      const respostaGoogle = await enviarParaGoogle();
-      return Response.json({ ok: true, google: respostaGoogle });
-    }
-
-    return Response.json({ ok: false, erro: "Nada para fazer" });
-  } catch (err) {
-    return Response.json({ ok: false, erro: "JSON inválido" }, { status: 400 });
+    return new Response(JSON.stringify({ ok: true, mudou }), { status: 200 });
+  } catch (error) {
+    console.error("Erro no POST:", error);
+    return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 500 });
   }
+}
+
+// Endpoint separado para enviar à Google API (chamado por botão ou ação)
+export async function GET() {
+  if (!scanParaEnviar) {
+    return new Response(JSON.stringify({ ok: false, error: "Nenhum scan para enviar" }), { status: 400 });
+  }
+
+  const resultado = await enviarParaGoogle(scanParaEnviar);
+  scanParaEnviar = null; // Limpa após envio
+
+  return new Response(JSON.stringify({ ok: true, resultado }), { status: 200 });
 }
